@@ -49,6 +49,11 @@ const timeUtil = {
     `${formatNumber(duration.hours)}:${formatNumber(duration.minutes)}:${formatNumber(duration.seconds)}`,
 };
 
+const BEIJING_OFFSET_MINUTES = 8 * 60;
+// Convert any Date to Beijing time (UTC+8) regardless of host timezone.
+const toBeijingDate = (date = new Date()) =>
+  new Date(date.getTime() + (date.getTimezoneOffset() + BEIJING_OFFSET_MINUTES) * 60 * 1000);
+
 const formatPointToAMap = (point) => [Number(point.longitude), Number(point.latitude)];
 const formatRouteToAMap = (route) => route.map((point) => formatPointToAMap(point));
 
@@ -169,8 +174,10 @@ const generateRunReq = async ({
   const maxSecond = Number(maxTime) * 60;
   const avgSecond = minSecond + maxSecond / 2;
   const waitSecond = Math.floor(normalRandom(minSecond + maxSecond / 2, (maxSecond - avgSecond) / 3));
-  const startTime = new Date();
-  const endTime = new Date(Number(startTime) + waitSecond * 1000);
+  const startTimeUtc = new Date();
+  const endTimeUtc = new Date(Number(startTimeUtc) + waitSecond * 1000);
+  const startTime = toBeijingDate(startTimeUtc);
+  const endTime = toBeijingDate(endTimeUtc);
 
   const originalDistanceNum = Number(distance);
   const randomIncrement = Math.random() * 0.05 + 0.01;
@@ -178,7 +185,7 @@ const generateRunReq = async ({
   const adjustedDistance = adjustedDistanceNum.toFixed(2);
 
   const avgSpeed = (adjustedDistanceNum / (waitSecond / 3600)).toFixed(2);
-  const duration = intervalToDuration({ start: startTime, end: endTime });
+  const duration = intervalToDuration({ start: startTimeUtc, end: endTimeUtc });
   const mac = await generateMac(stuNumber);
   const req = {
     LocalSubmitReason: '',
