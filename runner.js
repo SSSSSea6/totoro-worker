@@ -192,8 +192,12 @@ const generateRunReq = async ({
 }) => {
   const minSecond = Number(minTime) * 60;
   const maxSecond = Number(maxTime) * 60;
-  const avgSecond = minSecond + maxSecond / 2;
-  const waitSecond = Math.floor(normalRandom(minSecond + maxSecond / 2, (maxSecond - avgSecond) / 3));
+  const avgSecond = (minSecond + maxSecond) / 2;
+  const stdSecond = Math.max(5, (maxSecond - minSecond) / 6);
+  const waitSecond = Math.min(
+    maxSecond,
+    Math.max(minSecond, Math.floor(normalRandom(avgSecond, stdSecond))),
+  );
   const diffMs = offsetDiffMs();
   const now = new Date();
   const parsedCustomEnd = parseCustomEndTime(customEndTime);

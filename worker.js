@@ -30,16 +30,34 @@ async function acquireJob() {
   const job = pendingJobs?.[0];
   if (!job) return null;
 
-  const { data: updatedJob, error: lockError } = await supabase
-    .from('Tasks')
-    .update({ status: 'PROCESSING', result_log: null })
-    .eq('id', job.id)
-    .eq('status', 'PENDING')
-    .select('id, user_data')
-    .single();
+  const tryLock = async (clearLog = true) =>
+    supabase
+      .from('Tasks')
+      .update(clearLog ? { status: 'PROCESSING', result_log: null } : { status: 'PROCESSING' })
+      .eq('id', job.id)
+      .eq('status', 'PENDING')
+      .select('id, user_data')
+      .maybeSingle();
+
+  let { data: updatedJob, error: lockError } = await tryLock(true);
+  if (lockError && /result_log/i.test(lockError.message || '')) {
+    console.warn(
+      `[Worker ${WORKER_ID}] Tasks.result_log \u5217\u4e0d\u53ef\u7528\uff0c\u8df3\u8fc7\u6e05\u7a7a\u65e5\u5fd7\u91cd\u8bd5\uff1a${lockError.message}`,
+    );
+    ({ data: updatedJob, error: lockError } = await tryLock(false));
+  }
 
   if (lockError || !updatedJob) {
-    console.warn(`[Worker ${WORKER_ID}] \u4efb\u52a1 ${job.id} \u88ab\u5176\u4ed6\u5b9e\u4f8b\u9501\u5b9a\uff0c\u8df3\u8fc7`);
+    const { data: statusRow, error: statusError } = await supabase
+      .from('Tasks')
+      .select('status')
+      .eq('id', job.id)
+      .maybeSingle();
+    const currentStatus = statusRow?.status ?? '\u672a\u77e5';
+    console.warn(
+      `[Worker ${WORKER_ID}] \u4efb\u52a1 ${job.id} \u65e0\u6cd5\u9501\u5b9a\uff08\u5f53\u524d\u72b6\u6001\uff1a${currentStatus}\uff09`,
+      lockError || statusError || '',
+    );
     return null;
   }
 
