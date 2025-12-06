@@ -200,6 +200,7 @@ const generateRunReq = async ({
   );
   const diffMs = offsetDiffMs();
   const now = new Date();
+  const nowLocal = new Date(now.getTime() + diffMs);
   const parsedCustomEnd = parseCustomEndTime(customEndTime);
 
   const defaultLocalStart = new Date(now.getTime() + diffMs);
@@ -218,16 +219,23 @@ const generateRunReq = async ({
   const avgSpeed = (adjustedDistanceNum / (waitSecond / 3600)).toFixed(2);
   const duration = intervalToDuration({ start: startTime, end: endTime });
   const mac = await generateMac(stuNumber);
+  const runDateStr = format(endTime, 'yyyy-MM-dd');
+  const todayStr = format(nowLocal, 'yyyy-MM-dd');
+  const isBackfill = Boolean(parsedCustomEnd && runDateStr !== todayStr);
+  const evaluateDate = isBackfill ? runDateStr : format(endTime, 'yyyy-MM-dd HH:mm:ss');
+  const submitDate = isBackfill ? runDateStr : todayStr;
+  const consume = Math.round(adjustedDistanceNum * 67.34).toString();
+
   const req = {
-    LocalSubmitReason: '',
+    LocalSubmitReason: isBackfill ? 'offline-backfill' : '',
     avgSpeed,
     baseStation: '',
     endTime: format(endTime, 'HH:mm:ss'),
-    evaluateDate: format(endTime, 'yyyy-MM-dd HH:mm:ss'),
+    evaluateDate,
     fitDegree: '1',
     flag: '1',
     headImage: '',
-    ifLocalSubmit: '0',
+    ifLocalSubmit: isBackfill ? '1' : '0',
     km: adjustedDistance,
     mac,
     phoneInfo: '$CN11/iPhone15,4/17.4.1',
@@ -240,10 +248,12 @@ const generateRunReq = async ({
     startTime: format(startTime, 'HH:mm:ss'),
     steps: `${1000 + Math.floor(Math.random() * 1000)}`,
     stuNumber,
+    submitDate,
     taskId,
     token,
     usedTime: timeUtil.getHHmmss(duration),
     version: '1.2.14',
+    consume,
     warnFlag: '0',
     warnType: '0',
     faceData: '',
