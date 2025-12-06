@@ -13,31 +13,6 @@ const RATE_LIMIT_DELAY = Math.max(0, Number(process.env.WORKER_RATE_LIMIT_DELAY 
 const POLLING_DELAY = Number(process.env.WORKER_POLLING_DELAY ?? 15000);
 const WORKER_ID = process.env.WORKER_ID || `worker-${Math.random().toString(36).slice(2, 8)}`;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const runOnceTable = process.env.BACKFILL_RUN_ONCE_TABLE || 'backfill_run_records';
-
-async function checkRunOnce(stuNumber, runDate, isBackfill) {
-  if (!stuNumber || !runDate) return;
-  const dateStr = new Date(runDate).toISOString().slice(0, 10);
-  const { data, error } = await supabase
-    .from(runOnceTable)
-    .select('id')
-    .eq('stuNumber', stuNumber)
-    .eq('date', dateStr)
-    .maybeSingle();
-  if (error && error.code !== 'PGRST116') {
-    throw new Error(`查询补跑记录失败: ${error.message}`);
-  }
-  if (data?.id) {
-    throw new Error('同一天只能提交一次');
-  }
-  const { error: insertError } = await supabase
-    .from(runOnceTable)
-    .insert({ stuNumber, date: dateStr, isBackfill: isBackfill ? 1 : 0, created_at: new Date().toISOString() });
-  if (insertError) {
-    // 防止并发重复插入
-    throw new Error(`占位提交记录失败: ${insertError.message}`);
-  }
-}
 
 async function consumeBackfillCredit(userId) {
   const { data, error } = await supabase
@@ -143,11 +118,6 @@ async function processJob(job) {
   console.log(`[Worker ${WORKER_ID}] ?????? ${job.id}`);
   try {
     const isBackfill = Boolean(job.user_data?.customDate || job.user_data?.customPeriod);
-    const runDate = job.user_data?.customDate || new Date();
-    if (job.user_data?.session?.stuNumber) {
-      await checkRunOnce(job.user_data.session.stuNumber, runDate, isBackfill);
-    }
-
     if (isBackfill && job.user_data?.session?.stuNumber) {
       await consumeBackfillCredit(job.user_data.session.stuNumber);
     }
