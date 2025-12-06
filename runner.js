@@ -235,8 +235,9 @@ const generateRunReq = async ({
   const diffMs = offsetDiffMs();
   const now = new Date();
   const nowLocal = new Date(now.getTime() + diffMs);
-  const parsedCustomEnd =
+  const rawCustomEnd =
     parseCustomEndTime(customEndTime) || buildCustomEndFromSlot(customDate, customPeriod);
+  const parsedCustomEnd = rawCustomEnd ? new Date(rawCustomEnd.getTime() + diffMs) : null;
   const semesterStart = parseStartDate(startDate);
 
   const defaultLocalStart = new Date(now.getTime() + diffMs);
@@ -246,8 +247,11 @@ const generateRunReq = async ({
     if (parsedCustomEnd > nowLocal) {
       throw new Error('customEndTime 不可晚于当前时间');
     }
-    if (semesterStart && parsedCustomEnd < semesterStart) {
-      throw new Error('customEndTime 早于本学期开始时间');
+    if (semesterStart) {
+      const semesterStartLocal = new Date(semesterStart.getTime() + diffMs);
+      if (parsedCustomEnd < semesterStartLocal) {
+        throw new Error('customEndTime 早于本学期开始时间');
+      }
     }
   }
 
