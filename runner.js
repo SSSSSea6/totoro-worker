@@ -229,13 +229,20 @@ const generateRunReq = async ({
   const avgSecond = (minSecond + maxSecond) / 2;
   const stdSecond = Math.max(5, (maxSecond - minSecond) / 6);
   const midSecond = Math.floor((minSecond + maxSecond) / 2);
-  const waitSecond = Math.min(
-    maxSecond,
-    Math.max(
-      Math.max(minSecond, midSecond),
-      Math.floor(normalRandom(avgSecond, stdSecond)),
-    ),
-  );
+  const sampleWait = () => Math.floor(normalRandom(avgSecond, stdSecond));
+
+  let waitSecond = sampleWait();
+  let tries = 0;
+  // 保证至少在区间后半段，若采样落在中值前则重采样几次
+  while (waitSecond < midSecond && tries < 5) {
+    waitSecond = sampleWait();
+    tries += 1;
+  }
+  if (waitSecond < midSecond) {
+    const jitter = Math.floor(Math.random() * Math.max(10, maxSecond - midSecond));
+    waitSecond = midSecond + jitter;
+  }
+  waitSecond = Math.min(maxSecond, Math.max(midSecond, waitSecond));
   const diffMs = offsetDiffMs();
   const now = new Date();
   const nowLocal = new Date(now.getTime() + diffMs);
