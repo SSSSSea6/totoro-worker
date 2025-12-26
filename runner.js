@@ -217,32 +217,26 @@ const generateRunReq = async ({
   schoolId,
   stuNumber,
   phoneNumber,
-  minTime,
-  maxTime,
   customEndTime,
   startDate,
   customDate,
   customPeriod,
 }) => {
-  const minSecond = Number(minTime) * 60;
-  const maxSecond = Number(maxTime) * 60;
-  const avgSecond = (minSecond + maxSecond) / 2;
-  const stdSecond = Math.max(5, (maxSecond - minSecond) / 6);
-  const midSecond = Math.floor((minSecond + maxSecond) / 2);
-  const sampleWait = () => Math.floor(normalRandom(avgSecond, stdSecond));
+  // 以配速正态分布采样（主要集中在 6.5 min/km），范围限制 5~7.5 min/km
+  const samplePaceSeconds = () => {
+    const mean = 6.5 * 60;
+    const std = 25; // 约覆盖 5~7.5 min/km
+    let pace = Math.round(normalRandom(mean, std));
+    return Math.min(450, Math.max(300, pace)); // 300s=5min, 450s=7.5min
+  };
 
-  let waitSecond = sampleWait();
-  let tries = 0;
-  // 保证至少在区间后半段，若采样落在中值前则重采样几次
-  while (waitSecond < midSecond && tries < 5) {
-    waitSecond = sampleWait();
-    tries += 1;
-  }
-  if (waitSecond < midSecond) {
-    const jitter = Math.floor(Math.random() * Math.max(10, maxSecond - midSecond));
-    waitSecond = midSecond + jitter;
-  }
-  waitSecond = Math.min(maxSecond, Math.max(midSecond, waitSecond));
+  const originalDistanceNum = Number(distance);
+  const randomIncrement = Math.random() * 0.05 + 0.01;
+  const adjustedDistanceNum = originalDistanceNum + randomIncrement;
+  const adjustedDistance = adjustedDistanceNum.toFixed(2);
+
+  const paceSeconds = samplePaceSeconds();
+  const waitSecond = Math.max(60, Math.round(adjustedDistanceNum * paceSeconds));
   const diffMs = offsetDiffMs();
   const now = new Date();
   const nowLocal = new Date(now.getTime() + diffMs);
@@ -270,11 +264,6 @@ const generateRunReq = async ({
   const startTime = parsedCustomEnd
     ? new Date(endTime.getTime() - waitSecond * 1000)
     : defaultLocalStart;
-
-  const originalDistanceNum = Number(distance);
-  const randomIncrement = Math.random() * 0.05 + 0.01;
-  const adjustedDistanceNum = originalDistanceNum + randomIncrement;
-  const adjustedDistance = adjustedDistanceNum.toFixed(2);
 
   const avgSpeed = (adjustedDistanceNum / (waitSecond / 3600)).toFixed(2);
   const duration = intervalToDuration({ start: startTime, end: endTime });
